@@ -8,7 +8,6 @@ import (
 func TestRun(t *testing.T) {
 	var concurrency int64 = 20
 	var requests int64 = 10000
-	RequestStart(concurrency, 60*time.Second)
 	Run(func(id int64) bool {
 		return true
 	}, concurrency, requests, "测试函数执行效率", true)
