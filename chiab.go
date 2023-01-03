@@ -26,7 +26,6 @@ var chReady = make(chan struct{})
 var chGun = make(chan struct{})
 var chCompleted = make(chan *request, 1000)
 var readyCount int64
-var completedCountOld int64
 
 var totalRequests []*request
 
@@ -70,10 +69,7 @@ func Run(handler func(id int64) bool, concurrency, requests int64, title string,
 		}
 	}
 
-	var i int64 = 0
-	for ; i < concurrency; i++ {
-		chGun <- struct{}{}
-	}
+	close(chGun)
 
 	for len(totalRequests) < int(requests) {
 		req, ok := <-chCompleted
@@ -82,7 +78,7 @@ func Run(handler func(id int64) bool, concurrency, requests int64, title string,
 		}
 	}
 	runtime = time.Since(startTime)
-	reporting(concurrency, requests)
+	reporting(concurrency)
 
 }
 
@@ -90,16 +86,18 @@ func worker(id int64, handler func(id int64) bool, workers int64) {
 	chReady <- struct{}{}
 	<-chGun
 	var i int64 = 0
+	reqs := make([]request, workers)
 	for ; i < workers; i++ {
 		start := time.Now()
-		req := request{}
-		req.ok = handler(id)
-		req.runtime = time.Since(start)
-		chCompleted <- &req
+		reqs[i].ok = handler(id)
+		reqs[i].runtime = time.Since(start)
+	}
+	for index := range reqs {
+		chCompleted <- &reqs[index]
 	}
 }
 
-func reporting(concurrency int64, requests int64) {
+func reporting(concurrency int64) {
 	m := reportingItem{}
 	succeedCount := 0
 	for _, request := range totalRequests {
